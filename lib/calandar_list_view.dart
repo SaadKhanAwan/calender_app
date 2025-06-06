@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'viewmodels/platform_view_model.dart';
 import 'models/platform_model.dart';
+import 'models/ranking_date_model.dart';
 
 class CalandarListView extends StatefulWidget {
   const CalandarListView({super.key});
@@ -23,6 +24,7 @@ class CalandarListViewState extends State<CalandarListView> {
   DateTime selectedDate = DateTime.now();
   final PageController _pageController = PageController(initialPage: 1000);
   int currentWeekIndex = 1000;
+  String? _lastFetchedPlatformId;
 
   @override
   void initState() {
@@ -31,10 +33,29 @@ class CalandarListViewState extends State<CalandarListView> {
       final viewModel = context.read<PlatformViewModel>();
       viewModel.fetchPlatforms().then((_) {
         developer.log('Platforms loaded successfully', name: 'UI');
+        _fetchRankingsIfNeeded();
       }).catchError((error) {
         developer.log('Error loading platforms', name: 'UI', error: error);
       });
     });
+  }
+
+  void _fetchRankingsIfNeeded() {
+    final viewModel = context.read<PlatformViewModel>();
+    final platforms = viewModel.platforms;
+    if (platforms.isEmpty) return;
+
+    final platform = platforms[selectedTabIndex % platforms.length];
+    if (platform.id != _lastFetchedPlatformId) {
+      _lastFetchedPlatformId = platform.id;
+      viewModel.fetchPlatformRankings(platform.id);
+    }
+  }
+
+  @override
+  void didUpdateWidget(CalandarListView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _fetchRankingsIfNeeded();
   }
 
   @override
@@ -77,49 +98,53 @@ class CalandarListViewState extends State<CalandarListView> {
   }
 
   Widget _buildCalendar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          GestureDetector(
-            onTap: _showDatePicker,
-            child: Row(
-              children: [
-                Text(
-                  '${selectedDate.year} / ${selectedDate.month.toString().padLeft(2, '0')}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w500,
-                  ),
+    return Consumer<PlatformViewModel>(
+      builder: (context, viewModel, child) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: _showDatePicker,
+                child: Row(
+                  children: [
+                    Text(
+                      '${selectedDate.year} / ${selectedDate.month.toString().padLeft(2, '0')}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.keyboard_arrow_down, color: Colors.white),
+                  ],
                 ),
-                const SizedBox(width: 4),
-                const Icon(Icons.keyboard_arrow_down, color: Colors.white),
-              ],
-            ),
+              ),
+              const SizedBox(height: 15),
+              SizedBox(
+                height: 92,
+                child: PageView.builder(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() {
+                      currentWeekIndex = index;
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    return _buildWeekView(index, viewModel.rankingDates);
+                  },
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 15),
-          SizedBox(
-            height: 92,
-            child: PageView.builder(
-              controller: _pageController,
-              onPageChanged: (index) {
-                setState(() {
-                  currentWeekIndex = index;
-                });
-              },
-              itemBuilder: (context, index) {
-                return _buildWeekView(index);
-              },
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildWeekView(int weekIndex) {
+  Widget _buildWeekView(int weekIndex, List<RankingDate> rankingDates) {
     // Calculate the start of the week based on the current selected date and week offset
     DateTime baseDate = selectedDate;
     int weekOffset = weekIndex - 1000; // 1000 is our starting point
@@ -130,10 +155,7 @@ class CalandarListViewState extends State<CalandarListView> {
         weekStart.subtract(Duration(days: weekStart.weekday % 7));
 
     List<String> weekdays = ['日', '一', '二', '三', '四', '五', '六'];
-    List<String> dateLabels = List.generate(7, (index) {
-      DateTime currentDay = startOfWeek.add(Duration(days: index));
-      return '${currentDay.day}日';
-    });
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: List.generate(7, (index) {
@@ -145,12 +167,17 @@ class CalandarListViewState extends State<CalandarListView> {
             currentDay.month == DateTime.now().month &&
             currentDay.year == DateTime.now().year;
 
+        // Check if this date exists in rankingDates
+        String formattedDate = '${currentDay.year}-${currentDay.month.toString().padLeft(2, '0')}-${currentDay.day.toString().padLeft(2, '0')}';
+        bool hasRankingData = rankingDates.any((date) => date.value == formattedDate);
+
         return CalendarDayWidget(
           day: currentDay.day.toString(),
           weekday: weekdays[index],
-          dateLabel: dateLabels[index],
+          dateLabel: '${currentDay.day}日',
           isSelected: isSelected,
           isToday: isToday,
+          hasData: hasRankingData,
           onTap: () {
             setState(() {
               selectedDate = currentDay;
@@ -199,28 +226,40 @@ class CalandarListViewState extends State<CalandarListView> {
   }
 
   Widget _buildCategories() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: categories.asMap().entries.map((category) {
-          int index = category.key;
-          String categoryValue = category.value;
-          bool isSelected = index == selectedCategoriesIndex;
+    return Consumer<PlatformViewModel>(
+      builder: (context, viewModel, child) {
+        final labels = viewModel.labels;
+        final categories = labels.isNotEmpty ? labels : this.categories;
 
-          return CategoryButton(
-            label: categoryValue,
-            isSelected: isSelected,
-            onTap: () {
-              setState(() {
-                selectedCategoriesIndex = index;
-              });
-              print('Selected category: $category');
-            },
-          );
-        }).toList(),
-      ),
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: categories.asMap().entries.map((category) {
+                int index = category.key;
+                String categoryValue = category.value;
+                bool isSelected = index == selectedCategoriesIndex;
+
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: CategoryButton(
+                    label: categoryValue,
+                    isSelected: isSelected,
+                    onTap: () {
+                      setState(() {
+                        selectedCategoriesIndex = index;
+                      });
+                      print('Selected category: $category');
+                    },
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -401,12 +440,15 @@ class CalandarListViewState extends State<CalandarListView> {
                 );
               }
 
+              final platform = viewModel.platforms.isNotEmpty 
+                ? viewModel.platforms[selectedTabIndex % viewModel.platforms.length] 
+                : null;
+
               return Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: 5,
                   itemBuilder: (context, index) {
-                    final platform = viewModel.platforms.isNotEmpty ? viewModel.platforms[selectedTabIndex % viewModel.platforms.length] : null;
                     return ContentItem(
                       rank: index + 1,
                       platform: platform,
