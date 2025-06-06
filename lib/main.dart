@@ -1,8 +1,10 @@
-import 'package:custom_calandar_list/calandar_list_view.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'calandar_list_view.dart';
+import 'viewmodels/platform_view_model.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -10,14 +12,16 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Social Media App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'PingFang SC',
+    return ChangeNotifierProvider(
+      create: (_) => PlatformViewModel(),
+      child: MaterialApp(
+        title: 'Custom Calendar List',
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          visualDensity: VisualDensity.adaptivePlatformDensity,
+        ),
+        home: const CalandarListView(),
       ),
-      home: CalandarListView(),
-      debugShowCheckedModeBanner: false,
     );
   }
 }

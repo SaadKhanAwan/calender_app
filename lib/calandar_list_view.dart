@@ -1,7 +1,11 @@
+import 'dart:developer' as developer;
 import 'package:custom_calandar_list/widgets/calendar_day_widget.dart';
 import 'package:custom_calandar_list/widgets/category_button.dart';
 import 'package:custom_calandar_list/widgets/content_item.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'viewmodels/platform_view_model.dart';
+import 'models/platform_model.dart';
 
 class CalandarListView extends StatefulWidget {
   const CalandarListView({super.key});
@@ -19,6 +23,19 @@ class CalandarListViewState extends State<CalandarListView> {
   DateTime selectedDate = DateTime.now();
   final PageController _pageController = PageController(initialPage: 1000);
   int currentWeekIndex = 1000;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final viewModel = context.read<PlatformViewModel>();
+      viewModel.fetchPlatforms().then((_) {
+        developer.log('Platforms loaded successfully', name: 'UI');
+      }).catchError((error) {
+        developer.log('Error loading platforms', name: 'UI', error: error);
+      });
+    });
+  }
 
   @override
   void dispose() {
@@ -208,59 +225,110 @@ class CalandarListViewState extends State<CalandarListView> {
   }
 
   Widget _buildTabs() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: tabs.asMap().entries.map((entry) {
-            int index = entry.key;
-            String tab = entry.value;
-            bool isSelected = index == selectedTabIndex;
+    return Consumer<PlatformViewModel>(
+      builder: (context, viewModel, child) {
+        if (viewModel.isLoading) {
+          developer.log('Loading platforms...', name: 'UI');
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
+          );
+        }
 
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  selectedTabIndex = index;
-                });
-                print('Selected tab: $tab');
-              },
-              child: Container(
-                margin: const EdgeInsets.only(right: 12),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      isSelected ? Color(0xFF499FFF) : Colors.white,
-                      isSelected ? Color(0xFF9B59B6) : Colors.white,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.wechat,
-                      size: 18,
-                      color: isSelected ? Colors.white : Colors.black,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      tab,
-                      style: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
+        if (viewModel.error.isNotEmpty) {
+          developer.log('Error in UI: ${viewModel.error}', name: 'UI', error: viewModel.error);
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: tabs.asMap().entries.map((entry) {
+                int index = entry.key;
+                String tab = entry.value;
+                bool isSelected = index == selectedTabIndex;
+
+                return _buildTabItem(index, tab, isSelected);
+              }).toList()),
+            ),
+          );
+        }
+
+        final platforms = viewModel.platforms;
+        if (platforms.isEmpty) {
+          developer.log('No platforms available', name: 'UI');
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: tabs.asMap().entries.map((entry) {
+                int index = entry.key;
+                String tab = entry.value;
+                bool isSelected = index == selectedTabIndex;
+
+                return _buildTabItem(index, tab, isSelected);
+              }).toList()),
+            ),
+          );
+        }
+
+        // If API fails, use static tabs
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: tabs.asMap().entries.map((entry) {
+              int index = entry.key;
+              String tab = entry.value;
+              bool isSelected = index == selectedTabIndex;
+
+              return _buildTabItem(index, tab, isSelected);
+            }).toList()),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTabItem(int index, String tab, bool isSelected) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          selectedTabIndex = index;
+        });
+        developer.log('Selected tab: $tab', name: 'UI');
+      },
+      child: Container(
+        margin: const EdgeInsets.only(right: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              isSelected ? const Color(0xFF499FFF) : Colors.white,
+              isSelected ? const Color(0xFF9B59B6) : Colors.white,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.wechat,
+              size: 18,
+              color: isSelected ? Colors.white : Colors.black,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              tab,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.black,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
               ),
-            );
-          }).toList(),
+            ),
+          ],
         ),
       ),
     );
@@ -307,14 +375,47 @@ class CalandarListViewState extends State<CalandarListView> {
       child: Column(
         children: [
           _buildDropdowns(),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: 5,
-              itemBuilder: (context, index) {
-                return ContentItem(rank: index + 1);
-              },
-            ),
+          Consumer<PlatformViewModel>(
+            builder: (context, viewModel, child) {
+              if (viewModel.isLoading) {
+                developer.log('Loading content...', name: 'UI');
+                return const Expanded(
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+
+              if (viewModel.error.isNotEmpty) {
+                developer.log('Error loading content: ${viewModel.error}', name: 'UI', error: viewModel.error);
+                return Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: 5,
+                    itemBuilder: (context, index) {
+                      return ContentItem(
+                        rank: index + 1,
+                        platform: viewModel.platforms.isNotEmpty ? viewModel.platforms[0] : null,
+                        language: viewModel.currentLanguage,
+                      );
+                    },
+                  ),
+                );
+              }
+
+              return Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: 5,
+                  itemBuilder: (context, index) {
+                    final platform = viewModel.platforms.isNotEmpty ? viewModel.platforms[selectedTabIndex % viewModel.platforms.length] : null;
+                    return ContentItem(
+                      rank: index + 1,
+                      platform: platform,
+                      language: viewModel.currentLanguage,
+                    );
+                  },
+                ),
+              );
+            },
           ),
         ],
       ),
