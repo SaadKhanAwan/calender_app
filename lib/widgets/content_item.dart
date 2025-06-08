@@ -79,7 +79,7 @@ class ContentItem extends StatelessWidget {
                         ),
                         SizedBox(width: 8),
                         Text(
-                          '我是视频标题',
+                          '我是视频',
                           style: TextStyle(
                             color: Colors.black87,
                             fontSize: 14,
@@ -171,9 +171,9 @@ class ContentItem extends StatelessWidget {
           right: 10,
           top: 10,
           child: Container(
-            padding: EdgeInsets.all(10),
+            padding: EdgeInsets.all(6),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
               color: Color(0xFFF3F2FF).withOpacity(.9),
             ),
             child: Column(
@@ -182,7 +182,7 @@ class ContentItem extends StatelessWidget {
                   '14.3k',
                   style: TextStyle(
                     color: Color(0xFF7240F8),
-                    fontSize: 16,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
