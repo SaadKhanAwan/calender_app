@@ -14,7 +14,7 @@ class CategoryButton extends StatelessWidget {
     required this.label,
     required this.isSelected,
     required this.onTap,
-    this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+    this.padding = const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     this.margin = EdgeInsets.zero,
     this.icon,
   });
@@ -29,7 +29,7 @@ class CategoryButton extends StatelessWidget {
       child: Container(
         margin: margin,
         padding: isSelected
-            ? EdgeInsets.symmetric(horizontal: 16, vertical: 26)
+            ? EdgeInsets.symmetric(horizontal: 16, vertical: 20)
             : padding,
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -51,7 +51,7 @@ class CategoryButton extends StatelessWidget {
                 label,
                 style: TextStyle(
                   color: textColor,
-                  fontSize: width / 6,
+                  fontSize: width / 5,
                   fontWeight: FontWeight.w500,
                 ),
               )

@@ -285,8 +285,8 @@ class CalandarListViewState extends State<CalandarListView> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      isSelected ? Color(0xFF499FFF) : Colors.white,
-                      isSelected ? Color(0xFF9B59B6) : Colors.white,
+                      isSelected ? Color(0xFF499FFF) : Colors.transparent,
+                      isSelected ? Color(0xFF9B59B6) : Colors.transparent,
                     ],
                   ),
                   borderRadius: BorderRadius.circular(8),
